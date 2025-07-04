@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Personal Alexa AI Assistant",
   "main": "api/alexa.js",
+  "type": "module",
   "scripts": {
     "start": "vercel dev"
   },

@@ -1,6 +1,6 @@
-// Import necessary libraries
-const verifier = require('alexa-verifier-middleware');
-const axios = require('axios');
+import verifier from 'alexa-verifier-middleware';
+import axios from 'axios';
+
 
 // Configuration to disable Vercel's default body parser
 export const config = {
