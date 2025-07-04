@@ -46,18 +46,19 @@ export default async function handler(req, res) {
         break;
       case 'SessionEndedRequest':
         console.log('Session ended.');
-        res.status(200).send();
+        res.status(200).send(); // No response body needed for SessionEndedRequest
         break;
       default:
-        res.status(400).json({ error: 'Unknown request type' });
+        console.warn(`Unknown request type: ${alexaRequest.request.type}`);
+        res.status(200).json(buildResponse("I'm sorry, I don't understand that request.", true));
         break;
     }
   } catch (error) {
-    console.error('Error in handler:', error);
-    if (error.message === 'Verification Failure') {
-        return res.status(400).send('Verification Failure');
-    }
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Critical error in handler:', error);
+    // When any error occurs, send a valid, speakable response back to Alexa.
+    // This prevents the "INVALID_RESPONSE" error.
+    const errorMessage = "I'm sorry, I encountered a problem. Please try again later.";
+    res.status(200).json(buildResponse(errorMessage, true));
   }
 }
 
