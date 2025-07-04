@@ -1,0 +1,17 @@
+{
+  "name": "alexa-verifier-middleware",
+  "version": "1.0.0",
+  "description": "Personal Alexa AI Assistant",
+  "main": "api/alexa.js",
+  "scripts": {
+    "start": "vercel dev"
+  },
+  "keywords": ["alexa", "ai", "jarvis"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "alexa-verifier-middleware": "^1.0.2",
+    "axios": "^1.4.0",
+    "vercel": "^32.3.0"
+  }
+}
