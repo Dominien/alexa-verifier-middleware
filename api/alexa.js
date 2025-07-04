@@ -2,12 +2,32 @@
 const verifier = require('alexa-verifier-middleware');
 const axios = require('axios');
 
+// Configuration to disable Vercel's default body parser
+// This is crucial for alexa-verifier-middleware to work correctly
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+// Helper function to get the raw request body from the stream
+function getRawBody(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on('data', (chunk) => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', (err) => reject(err));
+  });
+}
+
+
 // --- Main Handler Function ---
 // This is the function Vercel will run when Alexa calls our URL.
-export default function handler(req, res) {
+export default async function handler(req, res) {
+    const rawBody = await getRawBody(req);
   // IMPORTANT: Run the security check first.
   // If the request isn't a valid, signed request from Amazon, stop immediately.
-  verifier(req.headers, req.rawBody, (err) => {
+  verifier(req.headers, rawBody, (err) => {
     if (err) {
       console.error('Request verification failed:', err);
       return res.status(400).send('Verification Failure');
@@ -15,7 +35,7 @@ export default function handler(req, res) {
 
     // If verification is successful, handle the request.
     try {
-      const alexaRequest = req.body;
+      const alexaRequest = JSON.parse(rawBody.toString());
 
       // Route the request based on its type (LaunchRequest, IntentRequest, etc.)
       switch (alexaRequest.request.type) {
@@ -33,6 +53,7 @@ export default function handler(req, res) {
           // User ended the session
           console.log('Session ended.');
           // No response is sent back for SessionEndedRequest
+          res.status(200).send();
           break;
 
         default:
