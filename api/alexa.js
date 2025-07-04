@@ -31,6 +31,12 @@ function getRawBody(req) {
 
 // --- Main Handler Function ---
 export default async function handler(req, res) {
+  // Alexa sends POST requests, browsers send GET requests.
+  // Handle browser access gracefully to prevent crashes.
+  if (req.method === 'GET') {
+    return res.status(200).send('This is an endpoint for an Alexa skill and is not meant to be accessed directly in a browser.');
+  }
+
   try {
     const rawBody = await getRawBody(req);
     await verify(req.headers, rawBody);
