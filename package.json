@@ -7,11 +7,15 @@
   "scripts": {
     "start": "vercel dev"
   },
-  "keywords": ["alexa", "ai", "jarvis"],
+  "keywords": [
+    "alexa",
+    "ai",
+    "jarvis"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "alexa-verifier-middleware": "^1.0.2",
+    "alexa-verifier": "^4.0.0",
     "axios": "^1.4.0",
     "vercel": "^32.3.0"
   }

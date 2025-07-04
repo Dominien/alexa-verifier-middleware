@@ -1,6 +1,5 @@
-import verifier from 'alexa-verifier-middleware';
+import verifier from 'alexa-verifier';
 import axios from 'axios';
-
 
 // Configuration to disable Vercel's default body parser
 export const config = {
@@ -8,16 +7,6 @@ export const config = {
     bodyParser: false,
   },
 };
-
-// Promisified version of the verifier
-const verify = (headers, rawBody) => new Promise((resolve, reject) => {
-  verifier(headers, rawBody, (err) => {
-    if (err) {
-      return reject(err);
-    }
-    resolve();
-  });
-});
 
 // Helper function to get the raw request body from the stream
 function getRawBody(req) {
@@ -32,14 +21,14 @@ function getRawBody(req) {
 // --- Main Handler Function ---
 export default async function handler(req, res) {
   // Alexa sends POST requests, browsers send GET requests.
-  // Handle browser access gracefully to prevent crashes.
   if (req.method === 'GET') {
-    return res.status(200).send('This is an endpoint for an Alexa skill and is not meant to be accessed directly in a browser.');
+    return res.status(200).send('This is an endpoint for an Alexa skill.');
   }
 
   try {
     const rawBody = await getRawBody(req);
-    await verify(req.headers, rawBody);
+    // The new verifier library handles the promise-based verification directly.
+    await verifier(req.headers, rawBody.toString());
 
     const alexaRequest = JSON.parse(rawBody.toString());
 
@@ -52,7 +41,7 @@ export default async function handler(req, res) {
         break;
       case 'SessionEndedRequest':
         console.log('Session ended.');
-        res.status(200).send(); // No response body needed for SessionEndedRequest
+        res.status(200).send();
         break;
       default:
         console.warn(`Unknown request type: ${alexaRequest.request.type}`);
@@ -61,8 +50,6 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Critical error in handler:', error);
-    // When any error occurs, send a valid, speakable response back to Alexa.
-    // This prevents the "INVALID_RESPONSE" error.
     const errorMessage = "I'm sorry, I encountered a problem. Please try again later.";
     res.status(200).json(buildResponse(errorMessage, true));
   }
