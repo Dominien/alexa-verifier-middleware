@@ -3,12 +3,21 @@ const verifier = require('alexa-verifier-middleware');
 const axios = require('axios');
 
 // Configuration to disable Vercel's default body parser
-// This is crucial for alexa-verifier-middleware to work correctly
 export const config = {
   api: {
     bodyParser: false,
   },
 };
+
+// Promisified version of the verifier
+const verify = (headers, rawBody) => new Promise((resolve, reject) => {
+  verifier(headers, rawBody, (err) => {
+    if (err) {
+      return reject(err);
+    }
+    resolve();
+  });
+});
 
 // Helper function to get the raw request body from the stream
 function getRawBody(req) {
@@ -20,51 +29,36 @@ function getRawBody(req) {
   });
 }
 
-
 // --- Main Handler Function ---
-// This is the function Vercel will run when Alexa calls our URL.
 export default async function handler(req, res) {
+  try {
     const rawBody = await getRawBody(req);
-  // IMPORTANT: Run the security check first.
-  // If the request isn't a valid, signed request from Amazon, stop immediately.
-  verifier(req.headers, rawBody, (err) => {
-    if (err) {
-      console.error('Request verification failed:', err);
-      return res.status(400).send('Verification Failure');
+    await verify(req.headers, rawBody);
+
+    const alexaRequest = JSON.parse(rawBody.toString());
+
+    switch (alexaRequest.request.type) {
+      case 'LaunchRequest':
+        res.status(200).json(buildResponse("Yes? How can I help?", false, "You can ask me anything."));
+        break;
+      case 'IntentRequest':
+        await handleIntentRequest(alexaRequest, res);
+        break;
+      case 'SessionEndedRequest':
+        console.log('Session ended.');
+        res.status(200).send();
+        break;
+      default:
+        res.status(400).json({ error: 'Unknown request type' });
+        break;
     }
-
-    // If verification is successful, handle the request.
-    try {
-      const alexaRequest = JSON.parse(rawBody.toString());
-
-      // Route the request based on its type (LaunchRequest, IntentRequest, etc.)
-      switch (alexaRequest.request.type) {
-        case 'LaunchRequest':
-          // User said: "Alexa, hallo Jarvis"
-          res.status(200).json(buildResponse("Yes? How can I help?", false, "You can ask me anything."));
-          break;
-
-        case 'IntentRequest':
-          // User said something after the invocation name
-          handleIntentRequest(alexaRequest, res);
-          break;
-
-        case 'SessionEndedRequest':
-          // User ended the session
-          console.log('Session ended.');
-          // No response is sent back for SessionEndedRequest
-          res.status(200).send();
-          break;
-
-        default:
-          res.status(400).json({ error: 'Unknown request type' });
-          break;
-      }
-    } catch (error) {
-      console.error('Error processing request:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+  } catch (error) {
+    console.error('Error in handler:', error);
+    if (error.message === 'Verification Failure') {
+        return res.status(400).send('Verification Failure');
     }
-  });
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 }
 
 // --- Intent Handling Logic ---
