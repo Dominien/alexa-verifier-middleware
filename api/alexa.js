@@ -27,8 +27,10 @@ export default async function handler(req, res) {
 
   try {
     const rawBody = await getRawBody(req);
-    // The new verifier library handles the promise-based verification directly.
-    await verifier(req.headers, rawBody.toString());
+    const { signaturecertchainurl, signature } = req.headers;
+
+    // The verifier requires the signature, the certificate URL, and the raw body.
+    await verifier(signaturecertchainurl, signature, rawBody);
 
     const alexaRequest = JSON.parse(rawBody.toString());
 
