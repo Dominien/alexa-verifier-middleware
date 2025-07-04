@@ -9,7 +9,7 @@ export default function handler(req, res) {
   // If the request isn't a valid, signed request from Amazon, stop immediately.
   verifier(req.headers, req.rawBody, (err) => {
     if (err) {
-      console.error(err);
+      console.error('Request verification failed:', err);
       return res.status(400).send('Verification Failure');
     }
 
@@ -21,7 +21,7 @@ export default function handler(req, res) {
       switch (alexaRequest.request.type) {
         case 'LaunchRequest':
           // User said: "Alexa, hallo Jarvis"
-          res.status(200).json(buildResponse("Yes?"));
+          res.status(200).json(buildResponse("Yes? How can I help?", false, "You can ask me anything."));
           break;
 
         case 'IntentRequest':
@@ -32,7 +32,7 @@ export default function handler(req, res) {
         case 'SessionEndedRequest':
           // User ended the session
           console.log('Session ended.');
-          res.status(200).json(buildResponse("Goodbye.", true));
+          // No response is sent back for SessionEndedRequest
           break;
 
         default:
@@ -50,6 +50,12 @@ export default function handler(req, res) {
 async function handleIntentRequest(alexaRequest, res) {
   const intentName = alexaRequest.request.intent.name;
 
+  // Handle standard stop/cancel intents to end the conversation
+  if (intentName === 'AMAZON.StopIntent' || intentName === 'AMAZON.CancelIntent') {
+    res.status(200).json(buildResponse("Goodbye.", true));
+    return;
+  }
+
   if (intentName === 'FreeformQuery') {
     // This is our main "catch-all" intent.
     const userQuery = alexaRequest.request.intent.slots.query.value;
@@ -57,42 +63,37 @@ async function handleIntentRequest(alexaRequest, res) {
     try {
       // Call our AI function to get a response from Gemini
       const aiResponse = await getGeminiResponse(userQuery);
-      // Send the AI's response back to Alexa
-      res.status(200).json(buildResponse(aiResponse));
+      
+      // Make the response conversational by asking a follow-up question
+      const conversationalText = `${aiResponse} What else would you like to know?`;
+      const repromptText = "You can ask me another question or say stop.";
+
+      // Send the AI's response back to Alexa, keeping the session open
+      res.status(200).json(buildResponse(conversationalText, false, repromptText));
+
     } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      const errorMessage = "I'm sorry, I encountered an error trying to process that.";
-      res.status(200).json(buildResponse(errorMessage));
+      console.error('Error calling Gemini API:', error.response ? error.response.data : error.message);
+      const errorMessage = "I'm sorry, I had trouble connecting to the AI. Please try again.";
+      res.status(200).json(buildResponse(errorMessage, false, "You can ask me another question."));
     }
   } else {
     // Handle other intents if we add them later
-    const unknownIntentMessage = "I'm not sure how to handle that request.";
-    res.status(200).json(buildResponse(unknownIntentMessage));
+    const unknownIntentMessage = "I'm not sure how to handle that request. What would you like to do?";
+    res.status(200).json(buildResponse(unknownIntentMessage, false, "You can ask me a question."));
   }
 }
 
 // --- AI Logic (Gemini API Call) ---
 async function getGeminiResponse(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
+  // Using the fast Flash model for quick conversational responses.
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
 
-  // For this MVP, we'll keep the calendar context simple.
-  // In the future, you could fetch this from a real calendar API.
-  const calendarContext = `
-    Current Date: July 4th, 2025.
-    Your Calendar:
-    - Today at 6 PM: Dinner with Sarah.
-    - Tomorrow at 10 AM: Project deadline.
-  `;
-
+  // A simpler, direct prompt for the MVP.
   const requestBody = {
     contents: [{
       parts: [{
-        text: `Context: You are a personal home AI assistant named Jarvis. ${calendarContext}
-
-User's Question: "${prompt}"
-
-Answer concisely as a helpful assistant.`
+        text: prompt
       }]
     }]
   };
@@ -101,22 +102,35 @@ Answer concisely as a helpful assistant.`
     headers: { 'Content-Type': 'application/json' }
   });
 
-  // Extract the text from the Gemini response
-  return response.data.candidates[0].content.parts[0].text;
+  // Extract the text from the Gemini response, with a fallback.
+  return response.data.candidates[0].content.parts[0].text || "I don't have a response for that.";
 }
 
 
 // --- Alexa Response Builder ---
 // A helper function to create the JSON object Alexa expects.
-function buildResponse(speechText, shouldEndSession = false) {
-  return {
-    version: '1.0',
-    response: {
+function buildResponse(speechText, shouldEndSession = false, repromptText = null) {
+  const responsePayload = {
+    outputSpeech: {
+      type: 'PlainText',
+      text: speechText,
+    },
+    shouldEndSession: shouldEndSession,
+  };
+
+  // Add a reprompt only if the session is staying open
+  if (!shouldEndSession) {
+    responsePayload.reprompt = {
       outputSpeech: {
         type: 'PlainText',
-        text: speechText,
+        // If no specific reprompt is provided, we can just use the main speech text.
+        text: repromptText || speechText,
       },
-      shouldEndSession: shouldEndSession,
-    },
+    };
+  }
+
+  return {
+    version: '1.0',
+    response: responsePayload,
   };
 }
