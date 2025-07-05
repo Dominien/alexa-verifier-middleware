@@ -16,6 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "alexa-verifier": "^4.0.0",
+    "ask-sdk-core": "^2.14.0",
     "axios": "^1.4.0",
     "vercel": "^32.3.0"
   }
