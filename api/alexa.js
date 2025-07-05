@@ -29,8 +29,18 @@ export default async function handler(req, res) {
     const rawBody = await getRawBody(req);
     const { signaturecertchainurl, signature } = req.headers;
 
-    // The verifier requires the signature, the certificate URL, and the raw body.
-    await verifier(signaturecertchainurl, signature, rawBody);
+    // --- Start of Recommended Change ---
+    // Added specific logging to isolate verifier issues.
+    try {
+      console.log('Attempting to verify the Alexa request...');
+      await verifier(signaturecertchainurl, signature, rawBody);
+      console.log('Request successfully verified.');
+    } catch (verifierError) {
+      console.error('ALEXA VERIFIER FAILED:', verifierError);
+      // Re-throw the error to be caught by the main catch block below
+      throw verifierError;
+    }
+    // --- End of Recommended Change ---
 
     const alexaRequest = JSON.parse(rawBody.toString());
 
